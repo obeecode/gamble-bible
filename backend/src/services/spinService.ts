@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Spin } from '../models/Spin';
 import { PendingPrize } from '../models/PendingPrize';
 import { Prize } from '../models/Prize';
@@ -264,7 +265,7 @@ export const performSpin = async (
         // Log spin
         await createAuditLog({
             action: 'spin',
-            user: userId || undefined,
+            user: userId ? new mongoose.Types.ObjectId(userId) : undefined,
             spin: spin._id,
             fingerprint,
             ipAddress,
@@ -394,7 +395,7 @@ export const awardPrize = async (
     
     await createAuditLog({
         action: 'prize_won',
-        user: userId,
+        user: new mongoose.Types.ObjectId(userId),
         prize: prize._id,
         severity: type === 'jackpot' ? 'critical' : 'info',
         details: {
@@ -460,7 +461,7 @@ export const claimPendingPrizes = async (userId: string, fingerprint: string): P
             
             await createAuditLog({
                 action: 'prize_claimed',
-                user: userId,
+                user: new mongoose.Types.ObjectId(userId),
                 prize: prize._id,
                 fingerprint,
                 severity: 'info',
