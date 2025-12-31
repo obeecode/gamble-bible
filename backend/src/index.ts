@@ -24,6 +24,8 @@ import { categoryRouter } from "./routes/category";
 import { notificationRouter } from "./routes/notification";
 import { connectDB } from "./utils/db";
 
+import { spinRouter } from './routes/spin';
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -56,6 +58,8 @@ app.use("/api/upload", uploadRouter);
 app.use("/api/comments", commentRouter);
 app.use("/api/categories", categoryRouter);
 app.use("/api/notifications", notificationRouter);
+
+app.use('/api/spins', spinRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
