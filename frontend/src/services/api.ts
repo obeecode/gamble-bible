@@ -68,13 +68,14 @@ api.interceptors.response.use(
 )
 
 export const authAPI = {
-  signup: async (data: { name: string; email: string; password: string }) => {
-    const response = await api.post('/auth/signup', data)
-    return response.data
+  signup: async (data: { name: string; email: string; password: string; fingerprint?: string }) => {
+    const response = await api.post('/auth/signup', data);
+    return response.data;
   },
-  login: async (data: { email: string; password: string }) => {
-    const response = await api.post('/auth/login', data)
-    return response.data
+
+  login: async (data: { email: string; password: string; fingerprint?: string }) => {
+    const response = await api.post('/auth/login', data);
+    return response.data;
   },
   getMe: async () => {
     const response = await api.get('/auth/me')
@@ -258,5 +259,41 @@ markPrizeAsPaid: async (id: string) => {
     return response.data
   },
 }
+
+// Add these to your existing api.ts file
+
+// Spin API methods
+export const spinAPI = {
+  // Spin the wheel (works with or without authentication)
+  spin: async (fingerprint: string) => {
+    const response = await api.post('/spins/spin', { fingerprint });
+    return response.data;
+  },
+
+  // Get spin statistics
+  getStats: async (fingerprint: string) => {
+    const response = await api.get('/spins/stats', { params: { fingerprint } });
+    return response.data;
+  },
+
+  // Get pending prizes
+  getPendingPrizes: async (fingerprint: string) => {
+    const response = await api.get('/spins/pending', { params: { fingerprint } });
+    return response.data;
+  },
+
+  // Claim pending prizes (requires authentication)
+  claimPending: async (fingerprint: string) => {
+    const response = await api.post('/spins/claim-pending', { fingerprint });
+    return response.data;
+  },
+
+  // Get spin configuration
+  getConfig: async () => {
+    const response = await api.get('/spins/config');
+    return response.data;
+  },
+};
+
 
 export default api
