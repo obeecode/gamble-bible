@@ -11,6 +11,7 @@
     "seed:blogs": "bun run scripts/seed-blogs.ts"
   },
   "dependencies": {
+    "@fingerprintjs/fingerprintjs": "^5.0.1",
     "@tailwindcss/vite": "^4.1.17",
     "@tanstack/react-query": "^5.90.11",
     "@tiptap/extension-image": "^3.12.0",
