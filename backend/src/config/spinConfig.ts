@@ -4,12 +4,12 @@
 
 export const SPIN_CONFIG = {
   // Rate Limits
-  HOURLY_SPIN_LIMIT: parseInt(process.env.HOURLY_SPIN_LIMIT || '10'), // Spins per hour per fingerprint
-  DAILY_SPIN_LIMIT: parseInt(process.env.DAILY_SPIN_LIMIT || '30'),   // Spins per day per fingerprint
+  HOURLY_SPIN_LIMIT: parseInt(process.env.HOURLY_SPIN_LIMIT || '1000'), // Spins per hour per fingerprint
+  DAILY_SPIN_LIMIT: parseInt(process.env.DAILY_SPIN_LIMIT || '5000'),   // Spins per day per fingerprint
   
   // Abuse Prevention
   MAX_ACCOUNTS_PER_FINGERPRINT: parseInt(process.env.MAX_ACCOUNTS_PER_FINGERPRINT || '5'), // Max accounts per device
-  MAX_SPINS_PER_IP_DAILY: parseInt(process.env.MAX_SPINS_PER_IP_DAILY || '100'), // Max spins per IP per day
+  MAX_SPINS_PER_IP_DAILY: parseInt(process.env.MAX_SPINS_PER_IP_DAILY || '5000'), // Max spins per IP per day
   SUSPICIOUS_ACTIVITY_THRESHOLD: parseInt(process.env.SUSPICIOUS_ACTIVITY_THRESHOLD || '3'), // Failed attempts before flagging
   
   // Prize Claim Settings

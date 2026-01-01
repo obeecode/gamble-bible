@@ -5,7 +5,7 @@ export interface ISpin extends Document {
     fingerprint: string;
     ipAddress: string;
     sessionId?: string;
-    result: 'no_win' | 'small_cash' | 'medium_cash' | 'large_cash' | 'bonus' | 'jackpot';
+    result: 'pending' | 'no_win' | 'small_cash' | 'medium_cash' | 'large_cash' | 'bonus' | 'jackpot';
     prizeAmount?: number;
     prizeAwarded: boolean;
     prizeId?: mongoose.Types.ObjectId;
@@ -44,7 +44,7 @@ const SpinSchema = new Schema<ISpin>(
         },
         result: {
             type: String,
-            enum: ['no_win', 'small_cash', 'medium_cash', 'large_cash', 'bonus', 'jackpot'],
+            enum: ['pending', 'no_win', 'small_cash', 'medium_cash', 'large_cash', 'bonus', 'jackpot'],
             required: true,
         },
         prizeAmount: {

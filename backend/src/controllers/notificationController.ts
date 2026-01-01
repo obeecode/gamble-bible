@@ -180,13 +180,16 @@ export const createNotificationHandler = async (req: AuthRequest, res: Response)
     }
 };
 
+// Update this function in your notificationController.ts
+
 // Helper function to create notifications (for use in other controllers)
 export const createNotification = async (data: {
     user: string;
-    type: 'comment' | 'reply' | 'system' | 'welcome' | 'blog';
+    type: 'comment' | 'reply' | 'system' | 'welcome' | 'blog' | 'prize'; // Added 'prize'
     title: string;
     message: string;
     link?: string;
+    data?: any; // Added for additional data like prizeId
 }) => {
     try {
         const notification = new Notification(data);

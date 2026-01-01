@@ -6,6 +6,86 @@ import { AuthRequest } from '../middleware/auth';
 import { createNotification } from './notificationController';
 import { sendPrizeClaimReceivedEmail, sendPrizePaymentConfirmationEmail } from '../utils/emailService';
 
+// Add this to your existing prizeController.ts
+
+import { createAuditLog } from '../models/AuditLog';
+import mongoose from 'mongoose';
+
+// NEW: Create prize from spin (works with authentication)
+export const createPrizeFromSpin = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { type, amount, description, fingerprint } = req.body;
+    const userId = req.user!.id; // Must be authenticated
+    
+    if (!type || !amount || !description) {
+        res.status(400).json({
+            success: false,
+            error: 'Type, amount, and description are required',
+        });
+        return;
+    }
+    
+    // Generate unique reference number
+    const referenceNumber = `SPIN-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    
+    // Set expiration date (30 days from now)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    
+    const prize = await Prize.create({
+        user: userId,
+        type,
+        amount,
+        description,
+        referenceNumber,
+        expiresAt,
+        status: 'unclaimed',
+    });
+    
+    // Create notification for the user
+    await createNotification({
+        user: userId,
+        type: 'prize',
+        title: 'New Prize Won!',
+        message: `You won ${description}!`,
+        data: { prizeId: prize._id },
+    });
+    
+    // Log prize creation from spin
+    if (fingerprint) {
+        await createAuditLog({
+            action: 'prize_won',
+            user: new mongoose.Types.ObjectId(userId),
+            prize: prize._id,
+            fingerprint,
+            severity: type === 'jackpot' ? 'critical' : 'info',
+            details: {
+                source: 'spin_wheel',
+                type,
+                amount,
+                description,
+            },
+        });
+    }
+    
+    res.status(201).json({
+        success: true,
+        data: { 
+            prize: {
+                id: prize._id,
+                type: prize.type,
+                amount: prize.amount,
+                description: prize.description,
+                referenceNumber: prize.referenceNumber,
+                status: prize.status,
+                expiresAt: prize.expiresAt,
+            }
+        },
+    });
+});
+
+// Keep all your other existing prize controller functions...
+// (getUserPrizes, claimPrize, markPrizeAsPaid, etc.)
+
 // Generate unique reference number
 const generateReferenceNumber = (): string => {
     const timestamp = Date.now().toString(36);

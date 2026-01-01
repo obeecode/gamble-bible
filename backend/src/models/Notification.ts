@@ -2,10 +2,11 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface INotification extends Document {
     user: mongoose.Types.ObjectId;
-    type: 'comment' | 'reply' | 'system' | 'welcome' | 'blog';
+    type: 'comment' | 'reply' | 'system' | 'welcome' | 'blog' | 'prize'; // Added 'prize'
     title: string;
     message: string;
     link?: string;
+    data?: any; // Added for storing additional data like prizeId
     isRead: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -21,7 +22,7 @@ const NotificationSchema = new Schema<INotification>(
         },
         type: {
             type: String,
-            enum: ['comment', 'reply', 'system', 'welcome', 'blog'],
+            enum: ['comment', 'reply', 'system', 'welcome', 'blog', 'prize'], // Added 'prize'
             default: 'system',
         },
         title: {
@@ -36,11 +37,16 @@ const NotificationSchema = new Schema<INotification>(
         },
         link: {
             type: String,
-            trim: true,
+            required: false,
+        },
+        data: {
+            type: Schema.Types.Mixed, // Added for storing additional data
+            required: false,
         },
         isRead: {
             type: Boolean,
             default: false,
+            index: true,
         },
     },
     {
@@ -49,6 +55,7 @@ const NotificationSchema = new Schema<INotification>(
 );
 
 // Index for efficient queries
-NotificationSchema.index({ user: 1, isRead: 1, createdAt: -1 });
+NotificationSchema.index({ user: 1, createdAt: -1 });
+NotificationSchema.index({ user: 1, isRead: 1 });
 
 export const Notification = mongoose.model<INotification>('Notification', NotificationSchema);

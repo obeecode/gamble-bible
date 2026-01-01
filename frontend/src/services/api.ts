@@ -260,13 +260,36 @@ markPrizeAsPaid: async (id: string) => {
   },
 }
 
-// Add these to your existing api.ts file
+// Update your api.ts with these methods
 
-// Spin API methods
+// Update your api.ts - Replace the spinAPI object with this:
+
 export const spinAPI = {
-  // Spin the wheel (works with or without authentication)
+  // Validate spin (rate limiting only - no prize decision)
   spin: async (fingerprint: string) => {
-    const response = await api.post('/spins/spin', { fingerprint });
+    const response = await api.post('/spins/validate', { fingerprint });
+    return response.data;
+  },
+
+  // Save prize (called AFTER frontend determines win) - UPDATED ENDPOINT
+  savePrize: async (data: { 
+    type: string; 
+    amount: number; 
+    description: string;
+    fingerprint: string;
+  }) => {
+    const response = await api.post('/prizes/from-spin', data); // Changed from /prizes to /prizes/from-spin
+    return response.data;
+  },
+
+  // Create pending prize for anonymous users
+  createPendingPrize: async (data: {
+    fingerprint: string;
+    result: string;
+    amount: number;
+    description: string;
+  }) => {
+    const response = await api.post('/spins/pending-prize', data);
     return response.data;
   },
 
@@ -276,21 +299,15 @@ export const spinAPI = {
     return response.data;
   },
 
-  // Get pending prizes
-  getPendingPrizes: async (fingerprint: string) => {
-    const response = await api.get('/spins/pending', { params: { fingerprint } });
-    return response.data;
-  },
-
-  // Claim pending prizes (requires authentication)
-  claimPending: async (fingerprint: string) => {
-    const response = await api.post('/spins/claim-pending', { fingerprint });
-    return response.data;
-  },
-
-  // Get spin configuration
+  // Get configuration
   getConfig: async () => {
     const response = await api.get('/spins/config');
+    return response.data;
+  },
+
+  // Claim pending prizes (called after login/signup)
+  claimPending: async (fingerprint: string) => {
+    const response = await api.post('/spins/claim-pending', { fingerprint });
     return response.data;
   },
 };

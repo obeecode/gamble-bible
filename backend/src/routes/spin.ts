@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import {
-    spin,
+    validateSpin,
     getStats,
     getPendingPrizes,
-    claimPending,
+    createPendingPrize,
     getConfig,
     getAllSpins,
     getAuditLogs,
@@ -14,14 +14,12 @@ import { authenticate, optionalAuth } from '../middleware/auth';
 
 const router = Router();
 
-// Public/Anonymous routes (no auth required, but can be authenticated)
-router.post('/spin', optionalAuth, spin); // Use optionalAuth middleware
+// Public/Anonymous routes
+router.post('/validate', optionalAuth, validateSpin); // Changed from /spin to /validate
 router.get('/config', getConfig);
 router.get('/stats', getStats);
 router.get('/pending', getPendingPrizes);
-
-// Authenticated routes
-router.post('/claim-pending', authenticate, claimPending);
+router.post('/pending-prize', createPendingPrize); // New endpoint for creating pending prizes
 
 // Admin routes
 router.get('/admin/all-spins', authenticate, getAllSpins);

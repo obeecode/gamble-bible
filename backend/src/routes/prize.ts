@@ -1,26 +1,26 @@
+// Update your prize-routes.ts
+
 import { Router } from 'express';
-import { 
-    createPrize, 
-    getUserPrizes, 
+import {
+    createPrize,
+    createPrizeFromSpin, // NEW
+    getUserPrizes,
     claimPrize,
+    getAllPrizes,
     markPrizeAsPaid,
-    getAllPrizes, 
-    expirePrizes 
 } from '../controllers/prizeController';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
-router.use(authenticate);
-
 // User routes
-router.post('/', createPrize);
-router.get('/', getUserPrizes);
-router.post('/:id/claim', claimPrize); // Changed from PATCH to POST to accept body
+router.post('/', authenticate, createPrize); // Original endpoint (admin/manual)
+router.post('/from-spin', authenticate, createPrizeFromSpin); // NEW - For spin wins
+router.get('/', authenticate, getUserPrizes);
+router.post('/:id/claim', authenticate, claimPrize);
 
 // Admin routes
-router.get('/admin/all', getAllPrizes); // Get all prizes (admin only)
-router.patch('/admin/:id/mark-paid', markPrizeAsPaid); // Mark prize as paid (NEW)
-router.post('/admin/expire', expirePrizes); // Expire old prizes (can be called by cron job)
+router.get('/admin/all-prizes', authenticate, getAllPrizes);
+router.patch('/admin/:id/mark-paid', authenticate, markPrizeAsPaid);
 
 export const prizeRouter = router;

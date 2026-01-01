@@ -1,24 +1,37 @@
 import { useState, useRef, useEffect } from 'react';
-import { Gift, TrendingUp, Newspaper, Star, DollarSign } from 'lucide-react';
-import { prizeAPI } from '../services/api';
+import { Gift, TrendingUp, Newspaper, Star, DollarSign, AlertCircle, Clock } from 'lucide-react';
+import { spinAPI } from '../services/api';
 import { toast } from 'react-toastify';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { getOrCreateFingerprint } from '../utils/fingerprintUtils';
 
 const RouletteSpinner = () => {
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [winner, setWinner] = useState(null);
   const [showPrizeModal, setShowPrizeModal] = useState(false);
-  const [prizeWon, setPrizeWon] = useState(null);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [prizeWon, setPrizeWon] = useState<any>(null);
+  const [pendingPrizeId, setPendingPrizeId] = useState<string | null>(null);
+  const [fingerprint, setFingerprint] = useState<string>('');
+  const [spinStats, setSpinStats] = useState<any>(null);
+  const [config, setConfig] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
   const wheelRef = useRef(null);
-  const idleAnimationRef = useRef(null);
+  const idleAnimationRef = useRef<number | null>(null);
   const lastTimeRef = useRef(Date.now());
+  
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const categories = [
     { name: 'Reviews', icon: Star, color: '#792ba4' },
     { name: 'Casinos', icon: TrendingUp, color: '#1a1a2e' },
     { name: 'Betting Sites', icon: Newspaper, color: '#792ba4' },
     { name: 'Bonuses', icon: Gift, color: '#1a1a2e' },
-    { name: 'Prize', icon: DollarSign, color: '#f59e0b ', isPrize: true },
+    { name: 'Prize', icon: DollarSign, color: '#f59e0b', isPrize: true },
     { name: 'Games', icon: Star, color: '#792ba4' },
     { name: 'News', icon: Newspaper, color: '#1a1a2e' },
     { name: 'GB Awards', icon: Star, color: '#792ba4' },
@@ -27,37 +40,52 @@ const RouletteSpinner = () => {
     { name: 'Forum', icon: TrendingUp, color: '#1a1a2e' }
   ];
 
+  // Prize definitions (local)
   const prizes = [
-    { type: 'cash', amount: 0.50, description: '$0.50 Cash Prize' },
-    { type: 'cash', amount: 0.25, description: '$0.25 Cash Prize' },
-    { type: 'cash', amount: 1.00, description: '$1.00 Cash Prize!' },
-    { type: 'bonus', amount: 5, description: '$5 Bet Account Funding' },
-    { type: 'points', amount: 100, description: '100 GB Points' }
+    { type: 'cash', spinType: 'small_cash', amount: 5, description: '$5 Cash Prize' },
+    { type: 'cash', spinType: 'small_cash', amount: 10, description: '$10 Cash Prize' },
+    { type: 'cash', spinType: 'medium_cash', amount: 25, description: '$25 Cash Prize' },
+    { type: 'cash', spinType: 'large_cash', amount: 50, description: '$50 Cash Prize' },
+    { type: 'cash', spinType: 'large_cash', amount: 100, description: '$100 Cash Prize!' },
   ];
 
   const segmentAngle = 360 / categories.length;
 
-  // Save prize to database
-  const savePrizeToDatabase = async (prize: any) => {
+  // Initialize fingerprint and load stats
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const fp = await getOrCreateFingerprint();
+        setFingerprint(fp);
+
+        const configResponse = await spinAPI.getConfig();
+        if (configResponse.success) {
+          setConfig(configResponse.data);
+        }
+
+        await loadSpinStats(fp);
+      } catch (error) {
+        console.error('Initialization error:', error);
+        toast.error('Failed to initialize spin wheel');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
+  }, []);
+
+  const loadSpinStats = async (fp: string) => {
     try {
-      const response = await prizeAPI.createPrize({
-        type: prize.type,
-        amount: prize.amount,
-        description: prize.description,
-      });
-      
+      const response = await spinAPI.getStats(fp);
       if (response.success) {
-        console.log('Prize saved:', response.data.prize);
-        // Trigger notification update
-        window.dispatchEvent(new CustomEvent('notificationUpdated'));
+        setSpinStats(response.data);
       }
     } catch (error) {
-      console.error('Failed to save prize:', error);
-      toast.error('Prize won but failed to save. Please contact support.');
+      console.error('Error loading spin stats:', error);
     }
   };
 
-  // Idle rotation effect
   useEffect(() => {
     const idleRotate = () => {
       if (!spinning) {
@@ -80,13 +108,23 @@ const RouletteSpinner = () => {
     };
   }, [spinning]);
 
-  const spinWheel = () => {
-    if (spinning) return;
+  const spinWheel = async () => {
+    if (spinning || !fingerprint) return;
+    
+    // Check local stats first (instant feedback)
+    if (spinStats && !spinStats.canSpin) {
+      toast.error('You have reached your spin limit. Please try again later.');
+      return;
+    }
     
     setSpinning(true);
     setWinner(null);
     setShowPrizeModal(false);
+    setShowRegisterModal(false);
 
+    // ====================================
+    // FRONTEND DETERMINES RESULT (INSTANT)
+    // ====================================
     const minSpins = 5;
     const maxSpins = 8;
     const spins = Math.floor(Math.random() * (maxSpins - minSpins + 1)) + minSpins;
@@ -96,9 +134,8 @@ const RouletteSpinner = () => {
     let winningIndex;
     let nearMissOffset = 0;
     
-    if (prizeChance < 0.90) {
-      // 2% chance - land on Prize (index 4)
-      winningIndex = 4;
+    if (prizeChance < 0.02) { // 2% chance for prize
+      winningIndex = 4; // Prize segment (index 4)
     } else {
       // 98% chance - land on any other segment (NOT Prize)
       const nonPrizeIndices = [0, 1, 2, 3, 5, 6, 7, 8, 9, 10];
@@ -106,14 +143,16 @@ const RouletteSpinner = () => {
       
       // 70% of the time when NOT winning, create a near-miss on Prize
       if (Math.random() < 0.7) {
-        // Land on the segment RIGHT AFTER Prize (index 5 - "Games")
-        winningIndex = 5;
+        winningIndex = 5; // Right after Prize
         nearMissOffset = segmentAngle * 0.15;
       }
     }
     
     const targetAngle = spins * 360 + (winningIndex * segmentAngle) + (segmentAngle / 2) + nearMissOffset;
     
+    // ====================================
+    // START ANIMATION IMMEDIATELY
+    // ====================================
     const startTime = Date.now();
     const duration = 5000;
     const startRotation = rotation;
@@ -143,28 +182,111 @@ const RouletteSpinner = () => {
           const winningSegment = categories.length - 1 - Math.floor(positiveRotation / segmentAngle) % categories.length;
           const adjustedWinningSegment = (winningSegment + categories.length) % categories.length;
           
-          setWinner(categories[adjustedWinningSegment].name);
+          const landedCategory = categories[adjustedWinningSegment];
+          setWinner(landedCategory.name);
           
-          if (categories[adjustedWinningSegment].isPrize) {
+          // ====================================
+          // DETERMINE PRIZE AFTER LANDING (Like Version A)
+          // ====================================
+          if (landedCategory.isPrize) {
+            // Select random prize
             const randomPrize = prizes[Math.floor(Math.random() * prizes.length)];
-            setPrizeWon(randomPrize);
-            
-            // Save prize to database if user is logged in
-            const token = localStorage.getItem('token');
-            if (token) {
-              savePrizeToDatabase(randomPrize);
-            }
-            
-            setTimeout(() => setShowPrizeModal(true), 500);
+            handlePrizeWin(randomPrize);
           }
         }, 100);
       }
     };
     
     requestAnimationFrame(animate);
+    
+    // ====================================
+    // BACKEND VALIDATION (IN BACKGROUND)
+    // ====================================
+    try {
+      const backendResponse = await spinAPI.spin(fingerprint);
+      
+      // Update stats after backend confirms
+      if (backendResponse.success) {
+        await loadSpinStats(fingerprint);
+      } else {
+        // Backend rejected (rate limit hit on server side)
+        toast.error(backendResponse.data?.message || 'Rate limit exceeded');
+      }
+    } catch (error: any) {
+      console.error('Backend spin validation error:', error);
+      // Don't show error to user - spin already happened
+      // Just log for monitoring
+    }
   };
 
-  const createRoundedSegmentPath = (index, total, outerRadius, innerRadius) => {
+  // Handle prize win (save to backend)
+  const handlePrizeWin = async (prize: any) => {
+    setPrizeWon(prize);
+    
+    if (user) {
+      // Logged in user - save prize immediately
+      try {
+        const response = await spinAPI.savePrize({
+          type: prize.type,
+          amount: prize.amount,
+          description: prize.description,
+          fingerprint,
+        });
+        
+        if (response.success) {
+          setTimeout(() => setShowPrizeModal(true), 500);
+          window.dispatchEvent(new CustomEvent('notificationUpdated'));
+        } else {
+          toast.error('Failed to save prize. Please contact support.');
+        }
+      } catch (error) {
+        console.error('Error saving prize:', error);
+        toast.error('Prize won but failed to save. Please contact support with timestamp: ' + new Date().toISOString());
+      }
+    } else {
+      // Anonymous user - create pending prize
+      try {
+        const response = await spinAPI.createPendingPrize({
+          fingerprint,
+          result: prize.spinType, // Use spinType for Spin model
+          amount: prize.amount,
+          description: prize.description,
+        });
+        
+        if (response.success) {
+          setPendingPrizeId(response.data.pendingPrizeId);
+          setTimeout(() => setShowRegisterModal(true), 500);
+        } else {
+          toast.error('Failed to save prize. Please contact support.');
+        }
+      } catch (error) {
+        console.error('Error creating pending prize:', error);
+        toast.error('Prize won but failed to save. Please contact support.');
+      }
+    }
+  };
+
+  const handleRegister = () => {
+    navigate('/signup', { 
+      state: { 
+        pendingPrize: true, 
+        fingerprint,
+        from: 'spin-wheel'
+      } 
+    });
+  };
+
+  const handleLogin = () => {
+    navigate('/login', { 
+      state: { 
+        pendingPrize: true, 
+        fingerprint,
+        from: 'spin-wheel'
+      } 
+    });
+  };
+
+  const createRoundedSegmentPath = (index: number, total: number, outerRadius: number, innerRadius: number) => {
     const angle = (360 / total) * (Math.PI / 180);
     const startAngle = (index * 360 / total - 90) * (Math.PI / 180);
     const endAngle = startAngle + angle;
@@ -199,6 +321,22 @@ const RouletteSpinner = () => {
 
   const isMobile = window.innerWidth < 640;
 
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(to bottom right, #111827, #1f2937, #000000)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <div style={{ color: 'white', fontSize: '1.125rem' }}>Loading...</div>
+      </div>
+    );
+  }
+
+  const canSpin = spinStats?.canSpin !== false;
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -221,9 +359,48 @@ const RouletteSpinner = () => {
           }}>
             Spin the wheel for a chance to win prizes!
           </p>
+          
+          {spinStats && (
+            <div style={{
+              marginTop: '1rem',
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <div style={{
+                background: '#1f2937',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #374151',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <Clock size={16} color="#10b981" />
+                <span style={{ color: '#10b981', fontSize: '0.875rem', fontWeight: '600' }}>
+                  {spinStats.hourlyRemaining} spins this hour
+                </span>
+              </div>
+              <div style={{
+                background: '#1f2937',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.5rem',
+                border: '1px solid #374151',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <Gift size={16} color="#3b82f6" />
+                <span style={{ color: '#3b82f6', fontSize: '0.875rem', fontWeight: '600' }}>
+                  {spinStats.dailyRemaining} spins today
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Roulette Wheel */}
+        {/* Wheel component */}
         <div style={{
           position: 'relative',
           display: 'flex',
@@ -231,7 +408,6 @@ const RouletteSpinner = () => {
           justifyContent: 'center',
           marginBottom: isMobile ? '1.5rem' : '2rem'
         }}>
-          {/* Pointer at top */}
           <div style={{
             position: 'absolute',
             top: 0,
@@ -246,7 +422,6 @@ const RouletteSpinner = () => {
             filter: 'drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3))'
           }} />
 
-          {/* Winning segment highlighter */}
           {!spinning && winner && (
             <div style={{
               position: 'absolute',
@@ -268,13 +443,11 @@ const RouletteSpinner = () => {
             </div>
           )}
 
-          {/* Wheel Container */}
           <div style={{
             position: 'relative',
             width: isMobile ? '350px' : '550px',
             height: isMobile ? '350px' : '550px'
           }}>
-            {/* SVG Wheel */}
             <svg
               ref={wheelRef}
               style={{
@@ -346,7 +519,6 @@ const RouletteSpinner = () => {
               })}
             </svg>
 
-            {/* Large center circle with button */}
             <div style={{
               position: 'absolute',
               top: '50%',
@@ -373,11 +545,13 @@ const RouletteSpinner = () => {
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  gap: '0.5rem'
                 }}>
                   <button
                     onClick={spinWheel}
-                    disabled={spinning}
+                    disabled={spinning || !canSpin}
                     style={{
                       pointerEvents: 'auto',
                       padding: isMobile ? '1rem 2rem' : '1.5rem 3rem',
@@ -385,36 +559,45 @@ const RouletteSpinner = () => {
                       fontWeight: 'bold',
                       fontSize: isMobile ? '1rem' : '1.25rem',
                       color: 'white',
-                      background: spinning ? '#6b7280' : 'linear-gradient(to right, #a855f7, #7c3aed)',
+                      background: (spinning || !canSpin) ? '#6b7280' : 'linear-gradient(to right, #a855f7, #7c3aed)',
                       border: 'none',
-                      cursor: spinning ? 'not-allowed' : 'pointer',
-                      boxShadow: spinning ? 'none' : '0 0 30px rgba(168, 85, 247, 0.6)',
+                      cursor: (spinning || !canSpin) ? 'not-allowed' : 'pointer',
+                      boxShadow: (spinning || !canSpin) ? 'none' : '0 0 30px rgba(168, 85, 247, 0.6)',
                       transform: 'scale(1)',
                       transition: 'all 0.2s',
                     }}
                     onMouseEnter={(e) => {
-                      if (!spinning) {
+                      if (!spinning && canSpin) {
                         e.currentTarget.style.transform = 'scale(1.05)';
-                        e.currentTarget.style.background = 'linear-gradient(to right, #a855f7, #7c3aed)';
                       }
                     }}
                     onMouseLeave={(e) => {
-                      if (!spinning) {
+                      if (!spinning && canSpin) {
                         e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.background = 'linear-gradient(to right, #a855f7, #7c3aed)';
                       }
                     }}
                   >
-                    {spinning ? 'SPINNING...' : 'SPIN ME!'}
+                    {spinning ? 'SPINNING...' : !canSpin ? 'LIMIT REACHED' : 'SPIN ME!'}
                   </button>
+                  
+                  {!canSpin && (
+                    <div style={{
+                      pointerEvents: 'auto',
+                      color: '#ef4444',
+                      fontSize: '0.75rem',
+                      textAlign: 'center',
+                      maxWidth: '180px'
+                    }}>
+                      Come back later!
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Result Display */}
-        {winner && !showPrizeModal && (
+        {winner && !showPrizeModal && !showRegisterModal && (
           <div style={{ textAlign: 'center', marginBottom: isMobile ? '1rem' : '1.5rem' }}>
             <div style={{
               display: 'inline-block',
@@ -436,7 +619,7 @@ const RouletteSpinner = () => {
           </div>
         )}
 
-        {/* Prize Modal */}
+        {/* Prize Modal (Logged-in users) */}
         {showPrizeModal && prizeWon && (
           <div style={{
             position: 'fixed',
@@ -490,15 +673,14 @@ const RouletteSpinner = () => {
                     color: '#9ca3af',
                     fontSize: isMobile ? '0.75rem' : '0.875rem'
                   }}>
-                    {prizeWon.type === 'bonus' 
-                      ? 'Check your prizes page to claim your bonus!'
-                      : prizeWon.type === 'points'
-                      ? 'Points added to your GB account'
-                      : 'Check your prizes page to claim!'}
+                    Check your prizes page to claim!
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowPrizeModal(false)}
+                  onClick={() => {
+                    setShowPrizeModal(false);
+                    navigate('/prizes');
+                  }}
                   style={{
                     background: 'linear-gradient(to right, #eab308, #ca8a04)',
                     color: 'white',
@@ -526,7 +708,115 @@ const RouletteSpinner = () => {
           </div>
         )}
 
-        {/* Info Section */}
+        {/* Register Modal (Anonymous users) */}
+        {showRegisterModal && prizeWon && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+            padding: '1rem'
+          }}>
+            <div style={{
+              background: 'linear-gradient(to bottom right, #facc15, #eab308)',
+              padding: '1px',
+              borderRadius: '1rem',
+              maxWidth: '28rem',
+              width: '100%'
+            }}>
+              <div style={{
+                background: '#1f2937',
+                borderRadius: '1rem',
+                padding: isMobile ? '1.5rem' : '2rem',
+                textAlign: 'center'
+              }}>
+                <AlertCircle style={{
+                  width: isMobile ? '3rem' : '4rem',
+                  height: isMobile ? '3rem' : '4rem',
+                  color: '#facc15',
+                  margin: '0 auto',
+                  marginBottom: '1rem'
+                }} />
+                <h2 style={{
+                  fontSize: isMobile ? '1.25rem' : '1.5rem',
+                  fontWeight: 'bold',
+                  color: 'white',
+                  marginBottom: '0.5rem'
+                }}>
+                  Congratulations! 🎉
+                </h2>
+                <p style={{
+                  color: '#facc15',
+                  fontSize: isMobile ? '1rem' : '1.125rem',
+                  fontWeight: 'bold',
+                  marginBottom: '1rem'
+                }}>
+                  You won {prizeWon.description}!
+                </p>
+                <p style={{
+                  color: '#9ca3af',
+                  fontSize: '0.875rem',
+                  marginBottom: '1.5rem',
+                  lineHeight: '1.5'
+                }}>
+                  Create an account or log in to claim your prize. Your prize will be held for 24 hours!
+                </p>
+                <div style={{ display: 'flex', gap: '0.75rem', flexDirection: 'column' }}>
+                  <button
+                    onClick={handleRegister}
+                    style={{
+                      background: 'linear-gradient(to right, #eab308, #ca8a04)',
+                      color: 'white',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      fontWeight: 'bold',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Create Account
+                  </button>
+                  <button
+                    onClick={handleLogin}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      color: 'white',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '0.5rem',
+                      fontWeight: '500',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Log In
+                  </button>
+                  <button
+                    onClick={() => setShowRegisterModal(false)}
+                    style={{
+                      background: 'transparent',
+                      color: '#9ca3af',
+                      padding: '0.5rem',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Maybe Later
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{
           marginTop: isMobile ? '2rem' : '3rem',
           background: '#1f2937',
@@ -549,10 +839,10 @@ const RouletteSpinner = () => {
             padding: 0
           }}>
             <li style={{ marginBottom: isMobile ? '0.375rem' : '0.5rem' }}>• Click "Spin Me" to spin the roulette wheel</li>
-            <li style={{ marginBottom: isMobile ? '0.375rem' : '0.5rem' }}>• Land on "Prize" to win cash, bonuses, or GB points</li>
-            <li style={{ marginBottom: isMobile ? '0.375rem' : '0.5rem' }}>• Prizes are saved to your account automatically</li>
-            <li style={{ marginBottom: isMobile ? '0.375rem' : '0.5rem' }}>• Each spin is completely random</li>
-            <li>• Login to save and claim your prizes</li>
+            <li style={{ marginBottom: isMobile ? '0.375rem' : '0.5rem' }}>• Land on "Prize" to win cash prizes</li>
+            <li style={{ marginBottom: isMobile ? '0.375rem' : '0.5rem' }}>• You get {config?.hourlyLimit || 100} spins per hour, {config?.dailyLimit || 500} per day</li>
+            <li style={{ marginBottom: isMobile ? '0.375rem' : '0.5rem' }}>• Create an account to claim your prizes</li>
+            <li>• Each spin is tracked to prevent abuse</li>
           </ul>
         </div>
 
