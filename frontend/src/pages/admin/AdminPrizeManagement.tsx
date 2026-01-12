@@ -34,19 +34,26 @@ const AdminPrizeManagement = () => {
   const [filter, setFilter] = useState<string>('processing');
   const [selectedPrize, setSelectedPrize] = useState<Prize | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const limit = 30;
 
   useEffect(() => {
     fetchPrizes();
-  }, [filter]);
+  }, [filter, page]);
 
   const fetchPrizes = async () => {
     try {
       setLoading(true);
-      const params = filter !== 'all' ? { status: filter } : {};
+      const params: any = { page, limit };
+      if (filter !== 'all') {
+        params.status = filter;
+      }
       const response = await prizeAPI.getAllPrizes(params);
       
       if (response.success) {
         setPrizes(response.data.prizes);
+        setPagination(response.data.pagination);
       }
     } catch (error) {
       console.error('Error fetching prizes:', error);
@@ -115,7 +122,7 @@ const AdminPrizeManagement = () => {
   };
 
   const stats = {
-    total: prizes.length,
+    total: pagination?.total || prizes.length,
     processing: prizes.filter(p => p.status === 'processing').length,
     paid: prizes.filter(p => p.status === 'paid').length,
     totalAmount: prizes.reduce((sum, p) => sum + p.amount, 0),
@@ -208,7 +215,10 @@ const AdminPrizeManagement = () => {
         {['all', 'processing', 'unclaimed', 'paid', 'expired'].map((status) => (
           <button
             key={status}
-            onClick={() => setFilter(status)}
+            onClick={() => {
+              setFilter(status);
+              setPage(1);
+            }}
             style={{
               padding: '0.5rem 1.5rem',
               borderRadius: '0.5rem',
@@ -241,103 +251,153 @@ const AdminPrizeManagement = () => {
           </p>
         </div>
       ) : (
-        <div style={{ 
-          background: '#1f2937',
-          borderRadius: '1rem',
-          border: '1px solid #374151',
-          overflow: 'hidden'
-        }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#111827', borderBottom: '1px solid #374151' }}>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>User</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Prize</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Amount</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Reference</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Status</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Date</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prizes.map((prize) => (
-                  <tr key={prize._id} style={{ borderBottom: '1px solid #374151' }}>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <User size={16} color="#9ca3af" />
-                        <div>
-                          <p style={{ color: '#f9fafb', fontWeight: '500' }}>{prize.user.name}</p>
-                          <p style={{ color: '#9ca3af', fontSize: '0.75rem' }}>{prize.user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', color: '#f9fafb' }}>{prize.description}</td>
-                    <td style={{ padding: '1rem', color: '#10b981', fontWeight: '600' }}>${prize.amount.toFixed(2)}</td>
-                    <td style={{ padding: '1rem', color: '#9ca3af', fontFamily: 'monospace', fontSize: '0.875rem' }}>{prize.referenceNumber}</td>
-                    <td style={{ padding: '1rem' }}>{getStatusBadge(prize.status)}</td>
-                    <td style={{ padding: '1rem', color: '#9ca3af', fontSize: '0.875rem' }}>{formatDate(prize.createdAt)}</td>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {prize.status === 'processing' && prize.paymentInfo && (
-                          <>
-                            <button
-                              onClick={() => handleViewPaymentInfo(prize)}
-                              style={{
-                                padding: '0.5rem 1rem',
-                                borderRadius: '0.5rem',
-                                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                                color: 'white',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.875rem',
-                                fontWeight: '500',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                              }}
-                            >
-                              <Eye size={16} />
-                              View Info
-                            </button>
-                            <button
-                              onClick={() => handleMarkAsPaid(prize._id)}
-                              style={{
-                                padding: '0.5rem 1rem',
-                                borderRadius: '0.5rem',
-                                background: 'linear-gradient(135deg, #10b981, #059669)',
-                                color: 'white',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.875rem',
-                                fontWeight: '500',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                              }}
-                            >
-                              <CheckCircle size={16} />
-                              Mark Paid
-                            </button>
-                          </>
-                        )}
-                        {prize.status === 'paid' && (
-                          <span style={{ color: '#10b981', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <CheckCircle size={16} />
-                            Payment Sent
-                          </span>
-                        )}
-                        {(prize.status === 'unclaimed' || prize.status === 'expired') && (
-                          <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
-                        )}
-                      </div>
-                    </td>
+        <>
+          <div style={{ 
+            background: '#1f2937',
+            borderRadius: '1rem',
+            border: '1px solid #374151',
+            overflow: 'hidden'
+          }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#111827', borderBottom: '1px solid #374151' }}>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>User</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Prize</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Amount</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Reference</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Status</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Date</th>
+                    <th style={{ padding: '1rem', textAlign: 'left', color: '#9ca3af', fontWeight: '600', fontSize: '0.875rem' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {prizes.map((prize) => (
+                    <tr key={prize._id} style={{ borderBottom: '1px solid #374151' }}>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <User size={16} color="#9ca3af" />
+                          <div>
+                            <p style={{ color: '#f9fafb', fontWeight: '500' }}>{prize.user.name}</p>
+                            <p style={{ color: '#9ca3af', fontSize: '0.75rem' }}>{prize.user.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem', color: '#f9fafb' }}>{prize.description}</td>
+                      <td style={{ padding: '1rem', color: '#10b981', fontWeight: '600' }}>${prize.amount.toFixed(2)}</td>
+                      <td style={{ padding: '1rem', color: '#9ca3af', fontFamily: 'monospace', fontSize: '0.875rem' }}>{prize.referenceNumber}</td>
+                      <td style={{ padding: '1rem' }}>{getStatusBadge(prize.status)}</td>
+                      <td style={{ padding: '1rem', color: '#9ca3af', fontSize: '0.875rem' }}>{formatDate(prize.createdAt)}</td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {prize.status === 'processing' && prize.paymentInfo && (
+                            <>
+                              <button
+                                onClick={() => handleViewPaymentInfo(prize)}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                                  color: 'white',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '500',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                }}
+                              >
+                                <Eye size={16} />
+                                View Info
+                              </button>
+                              <button
+                                onClick={() => handleMarkAsPaid(prize._id)}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  borderRadius: '0.5rem',
+                                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                                  color: 'white',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '0.875rem',
+                                  fontWeight: '500',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                }}
+                              >
+                                <CheckCircle size={16} />
+                                Mark Paid
+                              </button>
+                            </>
+                          )}
+                          {prize.status === 'paid' && (
+                            <span style={{ color: '#10b981', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <CheckCircle size={16} />
+                              Payment Sent
+                            </span>
+                          )}
+                          {(prize.status === 'unclaimed' || prize.status === 'expired') && (
+                            <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Pagination Controls */}
+          {pagination && pagination.pages > 1 && (
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              gap: '1rem',
+              marginTop: '2rem',
+              padding: '1rem',
+            }}>
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  background: page === 1 ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, #9333ea, #c026d3)',
+                  color: page === 1 ? '#6b7280' : 'white',
+                  border: 'none',
+                  cursor: page === 1 ? 'not-allowed' : 'pointer',
+                  fontWeight: '500',
+                }}
+              >
+                Previous
+              </button>
+              
+              <span style={{ color: '#9ca3af' }}>
+                Page {page} of {pagination.pages} ({pagination.total} total prizes)
+              </span>
+              
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page === pagination.pages}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  background: page === pagination.pages ? 'rgba(255, 255, 255, 0.05)' : 'linear-gradient(135deg, #9333ea, #c026d3)',
+                  color: page === pagination.pages ? '#6b7280' : 'white',
+                  border: 'none',
+                  cursor: page === pagination.pages ? 'not-allowed' : 'pointer',
+                  fontWeight: '500',
+                }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Payment Info Modal */}

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { authAPI } from '../services/api';
+import { toast } from 'react-toastify';
 
 interface User {
   id: string;
@@ -11,8 +12,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, fingerprint?: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, fingerprint?: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -82,15 +83,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initAuth();
   }, [logout]);
 
-  const login = async (email: string, password: string) => {
-    console.log('Attempting login...');
+  const login = async (email: string, password: string, fingerprint?: string) => {
+    console.log('Attempting login with fingerprint:', fingerprint);
     try {
-      const response = await authAPI.login({ email, password });
+      const response = await authAPI.login({ email, password, fingerprint });
       console.log('Login response:', response);
       
       if (response.success && response.data) {
-        const { user, token } = response.data;
+        const { user, token, pendingPrizes, pendingPrizesMessage } = response.data;
         console.log('Login successful, setting user and token');
+        
+        // Log if pending prizes were claimed
+        if (pendingPrizes && pendingPrizes.length > 0) {
+          console.log('✅ Claimed pending prizes:', pendingPrizes);
+          toast.success(`Welcome back! You claimed ${pendingPrizes.length} pending prize(s)!`);
+        }
         
         setUser(user);
         setToken(token);
@@ -108,15 +115,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (name: string, email: string, password: string) => {
-    console.log('Attempting signup...');
+  const signup = async (name: string, email: string, password: string, fingerprint?: string) => {
+    console.log('Attempting signup with fingerprint:', fingerprint);
     try {
-      const response = await authAPI.signup({ name, email, password });
+      const response = await authAPI.signup({ name, email, password, fingerprint });
       console.log('Signup response:', response);
       
       if (response.success && response.data) {
-        const { user, token } = response.data;
+        const { user, token, pendingPrizes, pendingPrizesMessage } = response.data;
         console.log('Signup successful, setting user and token');
+        
+        // Log if pending prizes were claimed
+        if (pendingPrizes && pendingPrizes.length > 0) {
+          console.log('✅ Claimed pending prizes:', pendingPrizes);
+          toast.success(`Welcome! You claimed ${pendingPrizes.length} pending prize(s)!`);
+        }
         
         setUser(user);
         setToken(token);

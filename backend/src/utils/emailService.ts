@@ -1,13 +1,13 @@
 import nodemailer from 'nodemailer';
 
-// Email configuration - update with your SMTP settings
+// Email configuration - Using port 465 with SSL
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false, // true for 465, false for other ports
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT || '465'),
+    secure: process.env.EMAIL_SECURE === 'true' || true, // true for 465, false for 587
     auth: {
-        user: process.env.SMTP_USER, // Your email
-        pass: process.env.SMTP_PASS, // Your email password or app password
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
     },
 });
 
@@ -29,7 +29,7 @@ interface SendEmailOptions {
 export const sendEmail = async (options: SendEmailOptions): Promise<boolean> => {
     try {
         const mailOptions = {
-            from: `"Gamble Bible" <${process.env.SMTP_USER}>`,
+            from: process.env.EMAIL_FROM || `"Gamble Bible" <${process.env.EMAIL_USER}>`,
             to: options.to,
             subject: options.subject,
             html: options.html,
@@ -118,7 +118,7 @@ export const sendPrizeClaimReceivedEmail = async (
             <h1>🎊 Great News, ${userName}!</h1>
         </div>
         <div class="content">
-            <h2>Gabu has received your prize claim request!</h2>
+            <h2>Gamble Bible has received your prize claim request!</h2>
             <p>We're excited to let you know that we've received your payment information and are now verifying your win.</p>
             
             <div class="prize-details">

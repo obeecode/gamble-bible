@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, UserPlus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { UserPlus, Eye, EyeOff } from 'lucide-react';
 
 const Signup = () => {
   const [name, setName] = useState('');
@@ -14,39 +14,49 @@ const Signup = () => {
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get fingerprint from navigation state (passed from RouletteSpinner)
+  const fingerprint = location.state?.fingerprint;
+  const hasPendingPrize = location.state?.pendingPrize;
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
+    e.preventDefault();
+    setError('');
 
-  if (password !== confirmPassword) {
-    setError('Passwords do not match');
-    return;
-  }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
 
-  if (password.length < 6) {
-    setError('Password must be at least 6 characters');
-    return;
-  }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
 
-  setLoading(true);
+    setLoading(true);
 
-  try {
-    console.log('Submitting signup form...');
-    await signup(name, email, password);
-    console.log('Signup successful, navigating to home...');
-    
-    // Small delay to ensure state is updated
-    setTimeout(() => {
-      navigate('/');
-    }, 100);
-  } catch (err: any) {
-    console.error('Signup error:', err);
-    setError(err.message || 'Signup failed. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      console.log('Submitting signup form with fingerprint:', fingerprint);
+      await signup(name, email, password, fingerprint);
+      console.log('Signup successful, navigating...');
+      
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        // If they had a pending prize, redirect to prizes page
+        if (hasPendingPrize) {
+          navigate('/prizes');
+        } else {
+          navigate('/');
+        }
+      }, 100);
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      setError(err.message || 'Signup failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="auth-page">
@@ -57,7 +67,11 @@ const Signup = () => {
               <UserPlus size={24} />
             </div>
             <h1 className="auth-title">Create account</h1>
-            <p className="auth-subtitle">Join us and start your journey</p>
+            <p className="auth-subtitle">
+              {hasPendingPrize 
+                ? '🎉 Create account to claim your prize!' 
+                : 'Join us and start your journey'}
+            </p>
           </div>
 
           {error && (

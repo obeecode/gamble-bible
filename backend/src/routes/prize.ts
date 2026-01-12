@@ -1,15 +1,13 @@
-// Update your prize-routes.ts
-
 import { Router } from 'express';
+import { authenticate } from '../middleware/auth';
 import {
     createPrize,
-    createPrizeFromSpin, // NEW
+    createPrizeFromSpin,
     getUserPrizes,
     claimPrize,
     getAllPrizes,
     markPrizeAsPaid,
 } from '../controllers/prizeController';
-import { authenticate } from '../middleware/auth';
 
 const router = Router();
 
@@ -20,7 +18,7 @@ router.get('/', authenticate, getUserPrizes);
 router.post('/:id/claim', authenticate, claimPrize);
 
 // Admin routes
-router.get('/admin/all-prizes', authenticate, getAllPrizes);
+router.get('/admin/all', authenticate, getAllPrizes); // ✅ Changed from /admin/all-prizes to /admin/all
 router.patch('/admin/:id/mark-paid', authenticate, markPrizeAsPaid);
 
 export const prizeRouter = router;

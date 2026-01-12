@@ -1,8 +1,10 @@
 import axios from 'axios'
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+
 const api = axios.create({
-  baseURL: '/api',
-  timeout: 30000, // Increased timeout for larger API responses
+  baseURL: API_BASE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -45,27 +47,6 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Only clear auth and redirect if we're not already on login/signup pages
-      const currentPath = window.location.pathname;
-      const isAuthPage = currentPath === '/login' || currentPath === '/signup';
-      
-      if (!isAuthPage) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        // Use setTimeout to avoid navigation during render
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
-      }
-    }
-    return Promise.reject(error);
-  }
-)
 
 export const authAPI = {
   signup: async (data: { name: string; email: string; password: string; fingerprint?: string }) => {
@@ -215,8 +196,6 @@ export const uploadAPI = {
   },
 }
 
-// Add these new methods to the existing prizeAPI object in frontend/src/services/api.ts
-
 export const prizeAPI = {
   createPrize: async (data: { type: string; amount: number; description: string }) => {
     const response = await api.post('/prizes', data)
@@ -227,21 +206,18 @@ export const prizeAPI = {
     return response.data
   },
   claimPrize: async (id: string, paymentInfo: {
-  fullName: string;
-  paymentMethod: string;
-  accountNumber: string;
-  bankName: string;
-}) => {
-  const response = await api.post(`/prizes/${id}/claim`, paymentInfo)
-  return response.data
-},
-
-// Add new method
-markPrizeAsPaid: async (id: string) => {
-  const response = await api.patch(`/prizes/admin/${id}/mark-paid`)
-  return response.data
-},
-  // NEW ADMIN ENDPOINTS
+    fullName: string;
+    paymentMethod: string;
+    accountNumber: string;
+    bankName: string;
+  }) => {
+    const response = await api.post(`/prizes/${id}/claim`, paymentInfo)
+    return response.data
+  },
+  markPrizeAsPaid: async (id: string) => {
+    const response = await api.patch(`/prizes/admin/${id}/mark-paid`)
+    return response.data
+  },
   getAllPrizes: async (params?: { status?: string; page?: number; limit?: number }) => {
     const response = await api.get('/prizes/admin/all', { params })
     return response.data
@@ -260,29 +236,20 @@ markPrizeAsPaid: async (id: string) => {
   },
 }
 
-// Update your api.ts with these methods
-
-// Update your api.ts - Replace the spinAPI object with this:
-
 export const spinAPI = {
-  // Validate spin (rate limiting only - no prize decision)
   spin: async (fingerprint: string) => {
     const response = await api.post('/spins/validate', { fingerprint });
     return response.data;
   },
-
-  // Save prize (called AFTER frontend determines win) - UPDATED ENDPOINT
   savePrize: async (data: { 
     type: string; 
     amount: number; 
     description: string;
     fingerprint: string;
   }) => {
-    const response = await api.post('/prizes/from-spin', data); // Changed from /prizes to /prizes/from-spin
+    const response = await api.post('/prizes/from-spin', data);
     return response.data;
   },
-
-  // Create pending prize for anonymous users
   createPendingPrize: async (data: {
     fingerprint: string;
     result: string;
@@ -292,25 +259,18 @@ export const spinAPI = {
     const response = await api.post('/spins/pending-prize', data);
     return response.data;
   },
-
-  // Get spin statistics
   getStats: async (fingerprint: string) => {
     const response = await api.get('/spins/stats', { params: { fingerprint } });
     return response.data;
   },
-
-  // Get configuration
   getConfig: async () => {
     const response = await api.get('/spins/config');
     return response.data;
   },
-
-  // Claim pending prizes (called after login/signup)
   claimPending: async (fingerprint: string) => {
     const response = await api.post('/spins/claim-pending', { fingerprint });
     return response.data;
   },
 };
-
 
 export default api
