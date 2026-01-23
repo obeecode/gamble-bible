@@ -5,6 +5,7 @@ import { prizeAPI } from '../services/api';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import PaymentInfoModal from '../components/PaymentInfoModal';
+import { trackPrizeClaim } from '../services/analytics'; // ← ADD THIS
 
 interface Prize {
   _id: string;
@@ -86,6 +87,10 @@ const Prizes = () => {
       const response = await prizeAPI.claimPrize(selectedPrize._id, paymentInfo);
       
       if (response.success) {
+      
+        // ✅ ADD THIS: Track the prize claim in Google Analytics
+        trackPrizeClaim(selectedPrize.amount, paymentInfo.paymentMethod);
+
         toast.success('Prize claim submitted! Check your email for confirmation.');
         setIsModalOpen(false);
         setSelectedPrize(null);

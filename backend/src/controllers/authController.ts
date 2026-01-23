@@ -27,12 +27,31 @@ const createToken = (id: string, email: string, role: string) => {
 };
 
 export const signup = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, password, fingerprint } = req.body;
+  const { name, email, password, fingerprint, username } = req.body;
 
-  if (!name || !email || !password) {
+  if (!name || !email || !password || !username) {
     res.status(400).json({
       success: false,
-      error: 'Please provide name, email, and password',
+      error: 'Please provide name, email, password, and username',
+    });
+    return;
+  }
+
+  // Validate username
+  if (username.length < 3 || username.length > 20) {
+    res.status(400).json({
+      success: false,
+      error: 'Username must be between 3 and 20 characters',
+    });
+    return;
+  }
+
+  // Check if username already exists
+  const existingUsername = await User.findOne({ username });
+  if (existingUsername) {
+    res.status(400).json({
+      success: false,
+      error: 'Username already taken',
     });
     return;
   }
@@ -53,6 +72,7 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
     name,
     email,
     password: hashedPassword,
+    username,
     role: 'user',
     metadata: {
       registrationIp: ipAddress,
@@ -74,6 +94,7 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
     details: {
       name: user.name,
       email: user.email,
+      username: user.username,
     },
   });
 
@@ -90,6 +111,7 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
+        username: user.username,
         role: user.role,
       },
       token,
@@ -105,12 +127,19 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   if (!email || !password) {
     res.status(400).json({
       success: false,
-      error: 'Please provide email and password',
+      error: 'Please provide email/username and password',
     });
     return;
   }
 
-  const user = await User.findOne({ email }).select('+password');
+  // Find user by email OR username
+  const user = await User.findOne({
+    $or: [
+      { email: email.toLowerCase() },
+      { username: email } // 'email' field can contain username
+    ]
+  }).select('+password');
+
   if (!user) {
     res.status(401).json({
       success: false,
@@ -130,14 +159,17 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
   const ipAddress = getClientIp(req);
 
-  // Update user metadata
+  // Update user metadata WITHOUT triggering validation
   if (fingerprint) {
-    user.metadata = {
-      ...user.metadata,
-      fingerprint,
-      lastIp: ipAddress,
-    };
-    await user.save();
+    await User.updateOne(
+      { _id: user._id },
+      { 
+        $set: { 
+          'metadata.fingerprint': fingerprint,
+          'metadata.lastIp': ipAddress
+        } 
+      }
+    );
   }
 
   const token = createToken(user._id.toString(), user.email, user.role);
@@ -164,6 +196,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
+        username: user.username,
         role: user.role,
       },
       token,
@@ -219,6 +252,7 @@ export const adminLogin = asyncHandler(async (req: Request, res: Response) => {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
+        username: user.username,
         role: user.role,
       },
       token,
@@ -227,19 +261,9 @@ export const adminLogin = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const getMe = asyncHandler(async (req: Request, res: Response) => {
-  // This should be called after authenticate middleware
-  // which sets req.user
-  const userId = (req as any).user?.id;
+  const userId = (req as any).user.id;
 
-  if (!userId) {
-    res.status(401).json({
-      success: false,
-      error: 'Not authenticated',
-    });
-    return;
-  }
-
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).select('-password');
   if (!user) {
     res.status(404).json({
       success: false,
@@ -255,7 +279,9 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
         id: user._id.toString(),
         name: user.name,
         email: user.email,
+        username: user.username,
         role: user.role,
+        createdAt: user.createdAt,
       },
     },
   });

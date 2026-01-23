@@ -69,15 +69,15 @@ const Login = () => {
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="auth-form-group">
               <label htmlFor="email" className="auth-label">
-                Email address
+                Email or Username
               </label>
               <input
                 id="email"
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="auth-input"
-                placeholder="you@example.com"
+                placeholder="you@example.com or username"
                 required
               />
             </div>

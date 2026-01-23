@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const Signup = () => {
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,6 +25,11 @@ const Signup = () => {
     e.preventDefault();
     setError('');
 
+    if (!name || !username || !email || !password) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -34,11 +40,17 @@ const Signup = () => {
       return;
     }
 
+    // Validate username
+    if (username.length < 3 || username.length > 20) {
+      setError('Username must be between 3 and 20 characters');
+      return;
+    }
+
     setLoading(true);
 
     try {
       console.log('Submitting signup form with fingerprint:', fingerprint);
-      await signup(name, email, password, fingerprint);
+      await signup(name, email, password, fingerprint, username);
       console.log('Signup successful, navigating...');
       
       // Small delay to ensure state is updated
@@ -83,7 +95,7 @@ const Signup = () => {
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="auth-form-group">
               <label htmlFor="name" className="auth-label">
-                Full name
+                Full name *
               </label>
               <input
                 id="name"
@@ -97,8 +109,28 @@ const Signup = () => {
             </div>
 
             <div className="auth-form-group">
+              <label htmlFor="username" className="auth-label">
+                Username *
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="auth-input"
+                placeholder="cooluser123"
+                minLength={3}
+                maxLength={20}
+                required
+              />
+              <small style={{ fontSize: '0.85rem', color: '#888', marginTop: '0.25rem', display: 'block' }}>
+                3-20 characters. This will be displayed publicly.
+              </small>
+            </div>
+
+            <div className="auth-form-group">
               <label htmlFor="email" className="auth-label">
-                Email address
+                Email address *
               </label>
               <input
                 id="email"
@@ -113,7 +145,7 @@ const Signup = () => {
 
             <div className="auth-form-group">
               <label htmlFor="password" className="auth-label">
-                Password
+                Password *
               </label>
               <div className="auth-input-wrapper">
                 <input
@@ -139,7 +171,7 @@ const Signup = () => {
 
             <div className="auth-form-group">
               <label htmlFor="confirmPassword" className="auth-label">
-                Confirm password
+                Confirm password *
               </label>
               <div className="auth-input-wrapper">
                 <input

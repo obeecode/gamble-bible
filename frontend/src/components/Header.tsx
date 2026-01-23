@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Bell, Menu, X, User } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Bell, Menu, X, User, LogOut } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { notificationAPI } from '../services/api';
 import NotificationPanel from './NotificationPanel';
@@ -9,7 +9,8 @@ const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
 
     useEffect(() => {
     if (user) {
@@ -40,14 +41,14 @@ const Header = () => {
     }
 };
 
-    const navItems = [
+const navItems = [
     { name: 'Reviews', path: '/reviews' },
     { name: 'Casinos', path: '/casino-reviews' },
     { name: 'Bookmakers', path: '/reviews' }, // Will use reviews page for now
-    { name: 'Bonuses', path: '/reviews' },
+    { name: 'Bonuses', path: '/bonuses' },
     { name: 'News', path: '/reviews' },
     { name: 'GB Awards', path: '/reviews' },
-    { name: 'Tools', path: '/reviews' },
+    { name: 'Tools', path: '/comingsoonpage' },
     { name: 'Guides', path: '/reviews' },
     { name: 'Complaints', path: '/reviews' },
     { name: 'Forum', path: '/reviews' },
@@ -59,6 +60,15 @@ const Header = () => {
         }
     };
 
+    const handleLogout = () => {
+        logout();
+        setIsMenuOpen(false);
+        navigate('/');
+    };
+
+    // Get display name - username if available, else name
+    const displayName = user ? (user.username || user.name) : '';
+
     return (
         <header className="header">
             <div className="container">
@@ -66,8 +76,8 @@ const Header = () => {
 
                     <div className="header-logo">
                         <Link to="/">
-                            <img src="/logo.png" className="header-logo-icon" />
-                            <img src="/Gamble Bible.png" className="header-logo-text" />
+                            <img src="/logo.png" className="header-logo-icon" alt="Logo Icon" />
+                            <img src="/Gamble Bible.png" className="header-logo-text" alt="Gamble Bible" />
                         </Link>
                     </div>
 
@@ -108,7 +118,7 @@ const Header = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <Link to={user.role === 'admin' ? '/admin' : '/'} className="login-btn">
                 <User size={18} />
-                <span>{user.name}</span>
+                <span>{displayName}</span>
             </Link>
         </div>
     ) : (
@@ -160,12 +170,30 @@ const Header = () => {
                                 {item.name}
                             </Link>
                         ))}
+                        {user && (
+                            <Link
+                                to="/prizes"
+                                className="mobile-nav-link"
+                                onClick={() => setIsMenuOpen(false)}
+                            >
+                                My Prizes
+                            </Link>
+                        )}
                         <div className="mobile-menu-divider">
                             {user ? (
-                                <div className="mobile-user-info">
-                                    <User size={18} />
-                                    <span>{user.name}</span>
-                                </div>
+                                <>
+                                    <div className="mobile-user-info">
+                                        <User size={18} />
+                                        <span>{displayName}</span>
+                                    </div>
+                                    <button 
+                                        onClick={handleLogout}
+                                        className="mobile-logout-btn"
+                                    >
+                                        <LogOut size={18} />
+                                        <span>Logout</span>
+                                    </button>
+                                </>
                             ) : (
                                 <Link
                                     to="/login"
@@ -185,4 +213,3 @@ const Header = () => {
 };
 
 export default Header;
-

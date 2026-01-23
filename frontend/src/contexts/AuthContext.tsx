@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 interface User {
   id: string;
   name: string;
+  username?: string; // NEW: Optional username field
   email: string;
   role: string;
 }
@@ -13,7 +14,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string, fingerprint?: string) => Promise<void>;
-  signup: (name: string, email: string, password: string, fingerprint?: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, fingerprint?: string, username?: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -115,10 +116,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (name: string, email: string, password: string, fingerprint?: string) => {
-    console.log('Attempting signup with fingerprint:', fingerprint);
+  const signup = async (name: string, email: string, password: string, fingerprint?: string, username?: string) => {
+    console.log('Attempting signup with fingerprint:', fingerprint, 'and username:', username);
     try {
-      const response = await authAPI.signup({ name, email, password, fingerprint });
+      const response = await authAPI.signup({ name, email, password, fingerprint, username });
       console.log('Signup response:', response);
       
       if (response.success && response.data) {
